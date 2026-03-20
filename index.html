@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mystical Forest Scorecard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
+<style>
+body{
+  margin:0;
+  font-family:Arial;
+  background:#0b0f1f;
+  color:white;
+  text-align:center;
+}
+.container{
+  max-width:500px;
+  margin:auto;
+  padding:20px;
+}
+button{
+  width:100%;
+  padding:16px;
+  margin:10px 0;
+  border:none;
+  border-radius:12px;
+  font-size:16px;
+  font-weight:bold;
+}
+.primary{
+  background:linear-gradient(90deg,#63ffb4,#5de2ff);
+  color:black;
+}
+.secondary{
+  background:#1a2035;
+  color:white;
+}
+input{
+  width:100%;
+  padding:12px;
+  margin:6px 0;
+  border-radius:10px;
+  border:none;
+}
+.card{
+  background:#121833;
+  padding:16px;
+  border-radius:16px;
+  margin-top:10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Mystical Forest Mini Golf</h1>
+
+<div id="app">
+<button class="primary" onclick="start()">Start Scorecard</button>
+<button class="secondary" onclick="showLeaderboard()">Leaderboard</button>
+</div>
+
+</div>
+
+<script>
+const supabaseClient = supabase.createClient(
+"https://wcurtraocymppnivpjjy.supabase.co",
+"sb_publishable_ct_jI98YJCIkpbK-JGBS1g_644cdpWA"
+);
+
+let players = [];
+let scores = [];
+
+function start(){
+document.getElementById("app").innerHTML = `
+<div class="card">
+<h3>How many players?</h3>
+<input id="playerCount" type="number" min="1" max="8" value="4">
+<button class="primary" onclick="setup()">Continue</button>
+</div>`;
+}
+
+function setup(){
+let count = document.getElementById("playerCount").value;
+
+let html = `<div class="card"><h3>Enter Names</h3>`;
+for(let i=0;i<count;i++){
+html += `<input id="p${i}" placeholder="Player ${i+1}">`;
+}
+html += `<button class="primary" onclick="build(${count})">Start Game</button></div>`;
+
+document.getElementById("app").innerHTML = html;
+}
+
+function build(count){
+players = Array.from({length: count}, (_,i)=>
+  document.getElementById("p"+i).value || "Player "+(i+1)
+);
+
+scores = Array(18).fill().map(()=>Array(count).fill(0));
+
+render();
+}
+
+function render(){
+let html = `<div class="card"><h3>Scorecard</h3>`;
+
+for(let h=0;h<18;h++){
+html += `<h4>Hole ${h+1}</h4>`;
+players.forEach((p,i)=>{
+html += `${p}: <input type="number" onchange="update(${h},${i},this.value)"><br>`;
+});
+}
+
+html += `
+<button class="primary" onclick="save()">Save Round</button>
+<button class="secondary" onclick="showLeaderboard()">Leaderboard</button>
+</div>`;
+
+document.getElementById("app").innerHTML = html;
+}
+
+function update(h,p,v){
+scores[h][p] = parseInt(v) || 0;
+}
+
+async function save(){
+for(let i=0;i<players.length;i++){
+let total = scores.reduce((a,b)=>a+(b[i]||0),0);
+
+await supabaseClient.from('scores').insert([{
+  name: players[i],
+  score: total,
+  created_at: new Date()
+}]);
+}
+
+alert("Score saved!");
+showLeaderboard();
+}
+
+async function showLeaderboard(){
+
+let start = new Date();
+start.setDate(1);
+start.setHours(0,0,0,0);
+
+let {data} = await supabaseClient
+.from('scores')
+.select('*')
+.gte('created_at', start.toISOString())
+.order('score',{ascending:true})
+.limit(10);
+
+let html = `<div class="card"><h3>🏆 Leaderboard (This Month)</h3>`;
+
+if(!data.length){
+html += "No scores yet!";
+} else {
+data.forEach((d,i)=>{
+html += `<p>${i+1}. ${d.name} - ${d.score}</p>`;
+});
+}
+
+html += `<button class="primary" onclick="start()">Play Again</button></div>`;
+
+document.getElementById("app").innerHTML = html;
+}
+</script>
+
+</body>
+</html>
